@@ -9,6 +9,19 @@
 
 (defctype %htmlDocPtr %xmlDocPtr)
 
+(defbitfield %htmlParserOption
+  (:html-parse-recover 1)          ; Relaxed parsing
+  (:html-parse-nodefdtd 4)         ; do not default a doctype if not found
+  (:html-parse-noerror 32)         ; suppress error reports
+  (:html-parse-nowarning 64)       ; suppress warning reports
+  (:html-parse-pedantic 128)       ; pedantic error reporting
+  (:html-parse-noblanks 256)       ; remove blank nodes
+  (:html-parse-nonet 2048)         ; Forbid network access
+  (:html-parse-noimplied 8192)     ; Do not add implied html/body... elements
+  (:html-parse-compact 65536)      ; compact small text nodes
+  (:html-parse-ignore-enc 2097152) ; ignore internal document encoding hint
+  )
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; create-html-document
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -87,24 +100,24 @@ NOTE: this will not change the document content encoding, just the META flag ass
   (cur %xmlCharPtr)
   (base-url %xmlCharPtr)
   (encoding %xmlCharPtr)
-  (options :int))
+  (options %htmlParserOption))
 
-(defmethod parse-html ((str string)  &key)
+(defmethod parse-html ((str string) &key options)
   (with-foreign-string (%utf8 "utf-8")
     (with-foreign-string (%str str)
       (%htmlReadDoc %str
                     (null-pointer)
                     %utf8
-                    0))))
+                    options))))
 
 ;;; parse-html ((path pathname) &key)
 
 (define-libxml2-function ("htmlReadFile" %htmlReadFile) %htmlDocPtr
   (filename %xmlCharPtr)
   (encoding %xmlCharPtr)
-  (options :int))
+  (options %htmlParserOption))
 
-(defmethod parse-html ((path pathname) &key encoding)
+(defmethod parse-html ((path pathname) &key encoding options)
   (gp:with-garbage-pool ()
     (let ((%path (gp:cleanup-register (cffi:foreign-string-alloc (format nil "~A" path))
                                       #'cffi:foreign-string-free))
@@ -114,7 +127,7 @@ NOTE: this will not change the document content encoding, just the META flag ass
                          (cffi:null-pointer))))
       (%htmlReadFile %path
                      %encoding
-                     0))))
+                     options))))
 
 ;;; parse-html ((uri puri:uri))
 
@@ -145,9 +158,9 @@ NOTE: this will not change the document content encoding, just the META flag ass
   (ioctx :pointer)
   (url %xmlCharPtr)
   (encoding %xmlCharPtr)
-  (options :int))
+  (options %htmlParserOption))
 
-(defmethod parse-html ((stream stream) &key encoding)
+(defmethod parse-html ((stream stream) &key encoding options)
   (let ((xtree::*stream-for-xml-parse* stream))
     (with-foreign-string (%utf-8 (or encoding "utf-8"))
       (%htmlReadIO (xtree::%stream-reader-callback xtree::*stream-for-xml-parse*)
@@ -155,7 +168,7 @@ NOTE: this will not change the document content encoding, just the META flag ass
                   (cffi:null-pointer)
                   (cffi:null-pointer)
                   (cffi:null-pointer)
-                  0))))
+                  options))))
   
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; with-parse-html
